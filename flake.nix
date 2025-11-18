@@ -155,6 +155,34 @@ nix fmt
           ++ builtins.attrValues scriptPackages;
       };
 
+      devShells.ci = pkgs.mkShell {
+        name = "ci";
+
+        # Minimal CI/CD tooling - no interactive development tools
+        packages = with pkgs; [
+          # Nix formatting
+          alejandra
+
+          # Go toolchain
+          go_1_25
+
+          # Testing
+          gotestsum
+          gotools
+
+          # Linting
+          golangci-lint
+
+          # Formatting
+          gofmt
+          golines
+          goimports
+
+          # Build
+          goreleaser
+        ];
+      };
+
       packages = {
         default = pkgs.buildGoModule {
           pname = "spectr";
