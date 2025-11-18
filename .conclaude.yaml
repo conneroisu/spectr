@@ -1,0 +1,142 @@
+# yaml-language-server: $schema=https://github.com/conneroisu/conclaude/releases/latest/download/conclaude-schema.json
+# Conclaude YAML Configuration - Complete Default Configuration
+# This configuration defines how conclaude handles Claude Code hook events
+# All supported options are shown below with their default values
+
+# Stop hook configuration - runs when Claude is about to stop
+stop:
+  # Structured command format with optional custom error messages
+  # Each command can have its own error message, and control output display
+  commands:
+    - run: "nix fmt"
+      showStdout: false
+      showStderr: false
+      message: "Nix formatting failed - please fix formatting errors before continuing"
+      maxOutputLines: 5
+    - run: "go install ."
+      showStdout: false
+      showStderr: false
+      message: "Installing go dependencies failed - please fix installation errors before continuing"
+      maxOutputLines: 5
+    - run: "nix develop -c 'tests'"
+      showStdout: false
+      showStderr: false
+      message: "Tests failed - please fix failing tests before continuing"
+      maxOutputLines: 5
+    - run: "nix develop -c 'lint'"
+      showStdout: false
+      showStderr: false
+      message: "Fix all lint errors without being lazy or ignoring them"
+      maxOutputLines: 5
+    - run: "spectr validate --all --strict"
+      showStdout: false
+      showStderr: false
+      message: "Spectr validation failed - please fix validation errors before continuing"
+      maxOutputLines: 5
+  # Examples:
+  # commands:
+  #   - run: "echo 'Starting build...'"
+  #     showStdout: true    # User/Claude sees: "Starting build..."
+  #
+  #   - run: "npm test"
+  #     showStdout: true    # Show test results to user/Claude
+  #     showStderr: true    # Show test errors to user/Claude
+  #     message: "Tests failed - please fix failing tests before continuing"
+  #     maxOutputLines: 100 # Limit output to last 100 lines (1-10000)
+  #
+  #   - run: "npm run build"
+  #     showStderr: true    # Only show build errors to user/Claude, hide stdout
+  #     message: "Build failed - please fix compilation errors"
+  #     maxOutputLines: 50  # Limit build output to last 50 lines
+
+  # Infinite mode - allows Claude to continue automatically
+  # When enabled, Claude receives the infiniteMessage to continue working
+  # instead of ending the session after stop hook commands succeed
+  infinite: false
+
+  # Message to send when infinite mode is enabled
+  infiniteMessage: "continue working on the task"
+
+  # Alternative to infinite mode - run for a specific number of rounds
+  # When set, Claude will continue for the specified number of rounds
+  rounds: null
+  # Example: rounds: 3
+
+# Validation rules for hook processing
+rules:
+  # Prevent Claude from creating or modifying files at the repository root
+  # Helps maintain clean project structure
+  preventRootAdditions: true
+
+  # Files that Claude cannot edit, using glob patterns
+  # Supports various glob patterns for flexible file protection
+  uneditableFiles:
+    - ".conclaude.yaml"
+    - ".golangci.yaml"
+    - ".golangci.yml"
+  # Examples:
+  # uneditableFiles:
+  #   - "./package.json"      # specific file
+  #   - "*.md"                # file extension
+  #   - "src/**/*.ts"         # nested patterns
+  #   - ".env*"               # environment files
+  #   - "docs/**"             # entire directories
+  #   - "{package,tsconfig}.json"  # multiple specific files
+
+  # Tool usage validation rules - control which tools can be used on which files
+  # Allows fine-grained control over tool usage based on file patterns
+  toolUsageValidation: []
+  # Examples:
+  # toolUsageValidation:
+  #   - tool: "Write"
+  #     pattern: "**/*.js"
+  #     action: "allow"
+  #     message: "Writing to JavaScript files is allowed"
+  #   - tool: "*"
+  #     pattern: ".env*"
+  #     action: "block"
+  #     message: "Environment files cannot be modified"
+
+# Pre-tool-use hook configuration - runs before tools are executed
+preToolUse:
+  # Directories where file additions are prevented (in addition to root)
+  # List of directory paths where new files cannot be created
+  preventAdditions: []
+  # Examples:
+  # preventAdditions:
+  #   - "dist"
+  #   - "build"
+  #   - "node_modules"
+
+  # Prevent editing of auto-generated files (enabled by default)
+  # Checks for common markers like "DO\ NOT\ EDIT", "Code\ generated\ by", etc.
+  preventGeneratedFileEdits: true
+
+  # Custom message when blocking auto-generated file edits
+  # Available placeholders: {file_path}, {marker}
+  generatedFileMessage: null
+  # Example:
+  # generatedFileMessage: "Cannot modify {file_path} - it contains '{marker}' indicating it's auto-generated"
+
+# System notifications configuration
+notifications:
+  # Enable system notifications for hook execution
+  enabled: false
+
+  # List of hook names that should trigger notifications
+  # Use ["*"] to receive notifications for all hooks
+  # Common hook names: "Stop", "PreToolUse", "PostToolUse", "SessionStart", "UserPromptSubmit", "Notification", "SubagentStop", "PreCompact"
+  hooks: []
+  # Examples:
+  # hooks: ["*"]                    # All hooks
+  # hooks: ["Stop", "PreToolUse"]   # Only specific hooks
+  # hooks: ["Stop"]                 # Only stop hook notifications
+
+  # Show error notifications (hook failures, system errors)
+  showErrors: false
+
+  # Show success notifications (hook completion, successful operations)
+  showSuccess: false
+
+  # Show system event notifications (session start/end, configuration loaded)
+  showSystemEvents: true

@@ -1,0 +1,9 @@
+.direnv
+result
+*.test
+logs
+*.log
+.DS_Store
+# Added by goreleaser init:
+dist/
+*.out
