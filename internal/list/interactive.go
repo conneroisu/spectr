@@ -1,0 +1,599 @@
+//nolint:revive // file-length-limit - interactive functions logically grouped
+package list
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+
+	"github.com/charmbracelet/bubbles/table"
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+const (
+	// Table column widths for changes view
+	changeIDWidth    = 30
+	changeTitleWidth = 40
+	changeDeltaWidth = 10
+	changeTasksWidth = 15
+
+	// Table column widths for specs view
+	specIDWidth           = 35
+	specTitleWidth        = 45
+	specRequirementsWidth = 15
+
+	// Table column widths for unified view
+	unifiedIDWidth      = 30
+	unifiedTypeWidth    = 8
+	unifiedTitleWidth   = 40
+	unifiedDetailsWidth = 20
+
+	// Truncation settings
+	changeTitleTruncate  = 38
+	specTitleTruncate    = 43
+	unifiedTitleTruncate = 38
+	ellipsisMinLength    = 3
+
+	// Table height
+	tableHeight = 10
+)
+
+// interactiveModel represents the bubbletea model for interactive table
+type interactiveModel struct {
+	table       table.Model
+	selectedID  string
+	copied      bool
+	quitting    bool
+	err         error
+	helpText    string
+	itemType    string    // "spec", "change", or "all"
+	projectPath string    // root directory of the project
+	allItems    ItemList  // all items when in unified mode
+	filterType  *ItemType // current filter when in unified mode (nil = show all)
+}
+
+// Init initializes the model
+func (interactiveModel) Init() tea.Cmd {
+	return nil
+}
+
+// Update handles messages
+func (m interactiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			m.quitting = true
+
+			return m, tea.Quit
+
+		case "enter":
+			m = m.handleEnter()
+
+			return m, tea.Quit
+
+		case "e":
+			return m.handleEdit()
+
+		case "t":
+			// Toggle filter type in unified mode
+			if m.itemType == "all" {
+				m = m.handleToggleFilter()
+
+				return m, nil
+			}
+		}
+
+	case editorFinishedMsg:
+		if msg.err != nil {
+			m.err = fmt.Errorf("editor error: %w", msg.err)
+			m.quitting = true
+
+			return m, tea.Quit
+		}
+		// Continue in TUI on success
+		return m, nil
+	}
+
+	// Update table with key events
+	m.table, cmd = m.table.Update(msg)
+
+	return m, cmd
+}
+
+// handleEnter handles the enter key press for copying selected ID
+func (m interactiveModel) handleEnter() interactiveModel {
+	cursor := m.table.Cursor()
+	if cursor < 0 || cursor >= len(m.table.Rows()) {
+		return m
+	}
+
+	row := m.table.Rows()[cursor]
+	if len(row) == 0 {
+		return m
+	}
+
+	// ID is in first column for all modes
+	m.selectedID = row[0]
+	m.copied = true
+
+	// Copy to clipboard
+	err := copyToClipboard(m.selectedID)
+	if err != nil {
+		m.err = err
+	}
+
+	return m
+}
+
+// handleEdit handles the 'e' key press for opening file in editor
+func (m interactiveModel) handleEdit() (interactiveModel, tea.Cmd) {
+	// Get the selected row
+	cursor := m.table.Cursor()
+	if cursor < 0 || cursor >= len(m.table.Rows()) {
+		return m, nil
+	}
+
+	row := m.table.Rows()[cursor]
+	if len(row) == 0 {
+		return m, nil
+	}
+
+	var itemID string
+	var isSpec bool
+
+	// Determine item type and ID based on mode
+	switch m.itemType {
+	case "all":
+		// In unified mode, need to check the item type
+		itemID = row[0]
+		itemTypeStr := row[1] // Type is second column in unified mode
+		isSpec = itemTypeStr == "SPEC"
+	case "spec":
+		// In spec-only mode
+		itemID = row[0]
+		isSpec = true
+	case "change":
+		// In change-only mode
+		itemID = row[0]
+		isSpec = false
+	default:
+		// Unknown mode, no editing allowed
+		return m, nil
+	}
+
+	// Check if EDITOR is set
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		m.err = fmt.Errorf("EDITOR environment variable not set")
+
+		return m, nil
+	}
+
+	// Construct file path based on type
+	var filePath string
+	if isSpec {
+		filePath = fmt.Sprintf("%s/spectr/specs/%s/spec.md", m.projectPath, itemID)
+	} else {
+		filePath = fmt.Sprintf("%s/spectr/changes/%s/proposal.md", m.projectPath, itemID)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		m.err = fmt.Errorf("file not found: %s", filePath)
+
+		return m, nil
+	}
+
+	// Launch editor - use tea.ExecProcess to handle editor lifecycle
+	c := exec.Command(editor, filePath) //nolint:gosec
+
+	return m, tea.ExecProcess(c, func(err error) tea.Msg {
+		return editorFinishedMsg{err: err}
+	})
+}
+
+// handleToggleFilter toggles between showing all items, only changes, and only specs
+func (m interactiveModel) handleToggleFilter() interactiveModel {
+	// Cycle through filter states: all -> changes -> specs -> all
+	if m.filterType == nil {
+		// Currently showing all, switch to changes only
+		changeType := ItemTypeChange
+		m.filterType = &changeType
+	} else {
+		switch *m.filterType {
+		case ItemTypeChange:
+			// Currently showing changes, switch to specs only
+			specType := ItemTypeSpec
+			m.filterType = &specType
+		case ItemTypeSpec:
+			// Currently showing specs, switch back to all
+			m.filterType = nil
+		}
+	}
+
+	// Rebuild the table with the new filter
+	m = rebuildUnifiedTable(m)
+
+	return m
+}
+
+// rebuildUnifiedTable rebuilds the table based on current filter
+func rebuildUnifiedTable(m interactiveModel) interactiveModel {
+	var items ItemList
+	if m.filterType == nil {
+		items = m.allItems
+	} else {
+		items = m.allItems.FilterByType(*m.filterType)
+	}
+
+	columns := []table.Column{
+		{Title: "ID", Width: unifiedIDWidth},
+		{Title: "Type", Width: unifiedTypeWidth},
+		{Title: "Title", Width: unifiedTitleWidth},
+		{Title: "Details", Width: unifiedDetailsWidth},
+	}
+
+	rows := make([]table.Row, len(items))
+	for i, item := range items {
+		var typeStr, details string
+		switch item.Type {
+		case ItemTypeChange:
+			typeStr = "CHANGE"
+			if item.Change != nil {
+				details = fmt.Sprintf("Tasks: %d/%d 🔺 %d",
+					item.Change.TaskStatus.Completed,
+					item.Change.TaskStatus.Total,
+					item.Change.DeltaCount,
+				)
+			}
+		case ItemTypeSpec:
+			typeStr = "SPEC"
+			if item.Spec != nil {
+				details = fmt.Sprintf("Reqs: %d", item.Spec.RequirementCount)
+			}
+		}
+
+		rows[i] = table.Row{
+			item.ID(),
+			typeStr,
+			truncateString(item.Title(), unifiedTitleTruncate),
+			details,
+		}
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(tableHeight),
+	)
+	applyTableStyles(&t)
+
+	m.table = t
+
+	// Update help text
+	filterDesc := "all"
+	if m.filterType != nil {
+		filterDesc = m.filterType.String() + "s"
+	}
+	m.helpText = fmt.Sprintf(
+		"↑/↓ or j/k: navigate | Enter: copy ID | e: edit spec | t: toggle filter (%s) | q: quit | showing: %d | project: %s",
+		filterDesc,
+		len(rows),
+		m.projectPath,
+	)
+
+	return m
+}
+
+// editorFinishedMsg is sent when the editor finishes
+type editorFinishedMsg struct {
+	err error
+}
+
+// View renders the model
+func (m interactiveModel) View() string {
+	if m.quitting {
+		if m.copied && m.err == nil {
+			return fmt.Sprintf("✓ Copied: %s\n", m.selectedID)
+		} else if m.err != nil {
+			return fmt.Sprintf(
+				"Copied: %s\nError: %v\n",
+				m.selectedID,
+				m.err,
+			)
+		}
+
+		return "Cancelled.\n"
+	}
+
+	// Display error message if present, but keep TUI active
+	view := m.table.View() + "\n" + m.helpText + "\n"
+	if m.err != nil {
+		view += fmt.Sprintf("\nError: %v\n", m.err)
+	}
+
+	return view
+}
+
+// RunInteractiveChanges runs the interactive table for changes
+func RunInteractiveChanges(changes []ChangeInfo, projectPath string) error {
+	if len(changes) == 0 {
+		return nil
+	}
+
+	columns := []table.Column{
+		{Title: "ID", Width: changeIDWidth},
+		{Title: "Title", Width: changeTitleWidth},
+		{Title: "Deltas", Width: changeDeltaWidth},
+		{Title: "Tasks", Width: changeTasksWidth},
+	}
+
+	rows := make([]table.Row, len(changes))
+	for i, change := range changes {
+		tasksStatus := fmt.Sprintf("%d/%d",
+			change.TaskStatus.Completed,
+			change.TaskStatus.Total)
+
+		rows[i] = table.Row{
+			change.ID,
+			truncateString(change.Title, changeTitleTruncate),
+			fmt.Sprintf("%d", change.DeltaCount),
+			tasksStatus,
+		}
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(tableHeight),
+	)
+
+	applyTableStyles(&t)
+
+	m := interactiveModel{
+		table:       t,
+		itemType:    "change",
+		projectPath: projectPath,
+		helpText: fmt.Sprintf(
+			"↑/↓ or j/k: navigate | Enter: copy ID | e: edit proposal | q: quit | showing: %d | project: %s",
+			len(rows),
+			projectPath,
+		),
+	}
+
+	p := tea.NewProgram(m)
+	finalModel, err := p.Run()
+	if err != nil {
+		return fmt.Errorf("error running interactive mode: %w", err)
+	}
+
+	// Check if there was an error during execution
+	if fm, ok := finalModel.(interactiveModel); ok && fm.err != nil {
+		// Don't return error, just warn - clipboard failure shouldn't
+		// stop the command
+		fmt.Fprintf(
+			os.Stderr,
+			"Warning: clipboard operation failed: %v\n",
+			fm.err,
+		)
+	}
+
+	return nil
+}
+
+// RunInteractiveArchive runs the interactive table for archive selection
+// Returns the selected change ID or empty string if cancelled
+func RunInteractiveArchive(changes []ChangeInfo, projectPath string) (string, error) {
+	if len(changes) == 0 {
+		return "", nil
+	}
+
+	columns := []table.Column{
+		{Title: "ID", Width: changeIDWidth},
+		{Title: "Title", Width: changeTitleWidth},
+		{Title: "Deltas", Width: changeDeltaWidth},
+		{Title: "Tasks", Width: changeTasksWidth},
+	}
+
+	rows := make([]table.Row, len(changes))
+	for i, change := range changes {
+		tasksStatus := fmt.Sprintf("%d/%d",
+			change.TaskStatus.Completed,
+			change.TaskStatus.Total)
+
+		rows[i] = table.Row{
+			change.ID,
+			truncateString(change.Title, changeTitleTruncate),
+			fmt.Sprintf("%d", change.DeltaCount),
+			tasksStatus,
+		}
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(tableHeight),
+	)
+
+	applyTableStyles(&t)
+
+	m := interactiveModel{
+		table:       t,
+		projectPath: projectPath,
+		helpText: fmt.Sprintf(
+			"↑/↓ or j/k: navigate | Enter: select | q: quit | showing: %d | project: %s",
+			len(rows),
+			projectPath,
+		),
+	}
+
+	p := tea.NewProgram(m)
+	finalModel, err := p.Run()
+	if err != nil {
+		return "", fmt.Errorf("error running interactive mode: %w", err)
+	}
+
+	// Return selected ID without clipboard operation
+	if fm, ok := finalModel.(interactiveModel); ok {
+		if fm.quitting && !fm.copied {
+			// User quit without selecting
+			return "", nil
+		}
+
+		return fm.selectedID, nil
+	}
+
+	return "", nil
+}
+
+// RunInteractiveSpecs runs the interactive table for specs
+func RunInteractiveSpecs(specs []SpecInfo, projectPath string) error {
+	if len(specs) == 0 {
+		return nil
+	}
+
+	columns := []table.Column{
+		{Title: "ID", Width: specIDWidth},
+		{Title: "Title", Width: specTitleWidth},
+		{Title: "Requirements", Width: specRequirementsWidth},
+	}
+
+	rows := make([]table.Row, len(specs))
+	for i, spec := range specs {
+		rows[i] = table.Row{
+			spec.ID,
+			truncateString(spec.Title, specTitleTruncate),
+			fmt.Sprintf("%d", spec.RequirementCount),
+		}
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(len(rows)),
+	)
+
+	applyTableStyles(&t)
+
+	m := interactiveModel{
+		table:       t,
+		itemType:    "spec",
+		projectPath: projectPath,
+		helpText: fmt.Sprintf(
+			"↑/↓ or j/k: navigate | Enter: copy ID | e: edit spec | q: quit | showing: %d | project: %s",
+			len(specs),
+			projectPath,
+		),
+	}
+
+	p := tea.NewProgram(m)
+	finalModel, err := p.Run()
+	if err != nil {
+		return fmt.Errorf("error running interactive mode: %w", err)
+	}
+
+	// Check if there was an error during execution
+	fm, ok := finalModel.(interactiveModel)
+	if ok && fm.err != nil {
+		// Don't return error, just warn - clipboard failure shouldn't
+		// stop the command.
+		fmt.Fprintf(
+			os.Stderr,
+			"Warning: clipboard operation failed: %v\n",
+			fm.err,
+		)
+	}
+
+	return nil
+}
+
+// RunInteractiveAll runs the interactive table for all items (changes and specs)
+func RunInteractiveAll(items ItemList, projectPath string) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	// Build initial table with all items
+	columns := []table.Column{
+		{Title: "ID", Width: unifiedIDWidth},
+		{Title: "Type", Width: unifiedTypeWidth},
+		{Title: "Title", Width: unifiedTitleWidth},
+		{Title: "Details", Width: unifiedDetailsWidth},
+	}
+
+	rows := make([]table.Row, len(items))
+	for i, item := range items {
+		var typeStr, details string
+		switch item.Type {
+		case ItemTypeChange:
+			typeStr = "CHANGE"
+			if item.Change != nil {
+				details = fmt.Sprintf("Tasks: %d/%d 🔺 %d",
+					item.Change.TaskStatus.Completed,
+					item.Change.TaskStatus.Total,
+					item.Change.DeltaCount,
+				)
+			}
+		case ItemTypeSpec:
+			typeStr = "SPEC"
+			if item.Spec != nil {
+				details = fmt.Sprintf("Reqs: %d", item.Spec.RequirementCount)
+			}
+		}
+
+		rows[i] = table.Row{
+			item.ID(),
+			typeStr,
+			truncateString(item.Title(), unifiedTitleTruncate),
+			details,
+		}
+	}
+
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(tableHeight),
+	)
+
+	applyTableStyles(&t)
+
+	m := interactiveModel{
+		table:       t,
+		itemType:    "all",
+		projectPath: projectPath,
+		allItems:    items,
+		filterType:  nil, // Start with all items visible
+		helpText: fmt.Sprintf(
+			"↑/↓ or j/k: navigate | Enter: copy ID | e: edit spec | t: toggle filter (all) | q: quit | showing: %d | project: %s",
+			len(rows),
+			projectPath,
+		),
+	}
+
+	p := tea.NewProgram(m)
+	finalModel, err := p.Run()
+	if err != nil {
+		return fmt.Errorf("error running interactive mode: %w", err)
+	}
+
+	// Check if there was an error during execution
+	if fm, ok := finalModel.(interactiveModel); ok && fm.err != nil {
+		// Don't return error, just warn - clipboard failure shouldn't
+		// stop the command
+		fmt.Fprintf(
+			os.Stderr,
+			"Warning: clipboard operation failed: %v\n",
+			fm.err,
+		)
+	}
+
+	return nil
+}
