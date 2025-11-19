@@ -36,8 +36,8 @@
 - [x] 6.5 Test backward compatibility - existing slash command files are preserved
 
 ## 7. Manual Testing
-- [ ] 7.1 Run `spectr init` in test project and select `claude-code`
-- [ ] 7.2 Verify both `CLAUDE.md` and `.claude/commands/spectr/*.md` are created
-- [ ] 7.3 Test with multiple tools selected simultaneously
-- [ ] 7.4 Test with existing slash command files (should not overwrite)
-- [ ] 7.5 Verify wizard still displays correct tool count and navigation works
+- [x] 7.1 Run `spectr init` in test project and select `claude-code`
+- [x] 7.2 Verify both `CLAUDE.md` and `.claude/commands/spectr/*.md` are created
+- [x] 7.3 Test with multiple tools selected simultaneously
+- [x] 7.4 Test with existing slash command files (should not overwrite)
+- [x] 7.5 Verify wizard still displays correct tool count and navigation works
