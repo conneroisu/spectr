@@ -111,22 +111,37 @@ func init() {
 - Manual registration list - Requires remembering to register new providers
 - Constructor functions - More boilerplate, delayed registration
 
-### Decision 6: Marker Utilities Stay in init/configurator.go
+### Decision 6: Shared ProviderKit Package
 
-**Chosen**: Keep `UpdateFileWithMarkers()` and related utilities in `internal/init/configurator.go`
+**Chosen**: Create `internal/providerkit` package that owns the interface alias plus all shared utilities (marker helpers, template manager, filesystem helpers used by providers)
 
 **Rationale**:
-- Used by multiple providers (not provider-specific logic)
-- Part of the initialization infrastructure
-- Moving would require providers to import complex helpers
-- Clear separation: providers use utilities, don't implement them
+- Eliminates the import cycle: providers import `providerkit`, init imports registry, neither needs to import each other
+- Keeps all shared helpers versioned together so providers and orchestrator stay in sync
+- Allows TemplateManager and marker utilities to be consumed by providers without reaching into `internal/init`
+- Keeps provider-specific package (`internal/providers`) lean; utilities live in a dedicated home
 
 **Alternatives considered**:
-- Move to providers package - Would pollute provider package with utilities
-- Move to separate util package - Over-engineering for ~150 lines
-- Duplicate in providers - Violates DRY principle
+- Keep helpers in `internal/init` - creates unavoidable cycle once executor imports providers
+- Copy helpers into providers - duplication risk and inconsistent behavior
+- Move helpers into providers - muddies package responsibilities and still leaves interface alias stranded
 
-### Decision 7: Backward-Compatible Configurator Interface
+### Decision 7: Provider Metadata Owned by Registry
+
+**Chosen**: Provider registry stores both the provider factory and user-facing metadata (name, priority, config/slash file paths, auto-install relationships)
+
+**Rationale**:
+- Wizard can render tool labels, help text, and ordering directly from the registry instead of duplicated hardcoded slices
+- Adding a provider becomes a single operation: register implementation + metadata in one call
+- Auto-install relationships (config → slash) live with provider definitions, so executor doesn’t need a separate mapping table
+- Ensures CLI/UX requirements (“appears automatically in spectr init”) are actually achievable
+
+**Alternatives considered**:
+- Keep metadata in `internal/init/registry.go` - violates “no edits outside provider file” goal
+- Rely on provider implementations to expose metadata ad-hoc - requires reflection/introspection and increases coupling
+- Hardcode metadata in wizard/executor - same maintenance burden we’re trying to remove
+
+### Decision 8: Backward-Compatible Configurator Interface
 
 **Chosen**: Keep existing `Configurator` interface name and methods unchanged
 
@@ -150,14 +165,14 @@ type Configurator interface {
 
 ## Risks / Trade-offs
 
-### Risk: Import Cycle
+### Risk: ProviderKit Drift
 
-**Risk**: `internal/init` imports `internal/providers`, providers might need init utilities
+**Risk**: Extracting utilities into `internal/providerkit` introduces another shared package that could diverge from init/providers expectations.
 
 **Mitigation**:
-- Keep shared utilities (markers) in `internal/init/configurator.go`
-- Providers import `internal/init` for utilities - one-way dependency
-- If cycle occurs, extract shared utilities to `internal/init/shared` or similar
+- Keep ProviderKit surface area small (interface alias, marker utilities, template manager, slash base helpers)
+- Add unit tests in both packages that assert shared behavior (e.g., marker updates, template rendering)
+- Document ProviderKit contracts so contributor checklists include verifying changes across both call sites
 
 ### Risk: Test Complexity
 
@@ -189,31 +204,36 @@ type Configurator interface {
 
 ## Migration Plan
 
-### Phase 1: Create New Package (No Breaking Changes)
-1. Create `internal/providers/provider.go` with interface and registry
-2. Extract one example provider (e.g., claude.go) and verify it works
-3. All existing code still uses `internal/init/configurator.go`
+### Phase 1: Stand Up Shared Infrastructure
+1. Create `internal/providerkit` containing the Configurator alias, marker utilities, template manager, and slash base implementation (no functional change yet)
+2. Introduce provider registry in `internal/providers/registry.go` that stores metadata + factories but still backed by existing configurator types
+3. Add tests that cover registry behavior, metadata validation, and ProviderKit helpers
 
-### Phase 2: Extract All Providers
-4. Extract remaining 18+ providers following claude.go pattern
-5. Each provider self-registers in init()
-6. Run tests after each extraction to catch issues early
+### Phase 2: Pilot Extraction
+4. Move Claude config + slash providers into `internal/providers` so they use ProviderKit and register metadata/factories
+5. Wire executor/wizard to use the new registry path for Claude only, keeping the old switch for remaining tools as fallback
+6. Run the full test suite to ensure hybrid path works before large migration
 
-### Phase 3: Update Executor
-7. Replace executor.getConfigurator() switch with `providers.GetProvider()`
-8. Update imports across init package
-9. Run full test suite
+### Phase 3: Extract Remaining Providers
+7. Move the rest of the config-based providers into their own files, ensuring each registers metadata + factories
+8. Move slash providers and factories, deleting the duplicated constructors in `internal/init/configurator.go`
+9. Keep running targeted tests after each move to catch regressions early
 
-### Phase 4: Cleanup
-10. Remove extracted providers from configurator.go (now empty except utilities)
-11. Update documentation and comments
-12. Verify golangci-lint passes
+### Phase 4: Flip Execution Path
+10. Remove the old `getConfigurator` switch in executor and rely solely on the registry response for both tool lists and configurators
+11. Update wizard + registry consumers to rely on provider metadata (names, priorities, file paths) rather than the legacy `ToolRegistry`
+12. Ensure auto-install relationships are modeled via metadata (`DependsOn`/`Installs`) instead of `configToSlashMapping`
+
+### Phase 5: Cleanup
+13. Delete the legacy configurator implementations from `internal/init/configurator.go`, leaving only ProviderKit imports if needed
+14. Remove the obsolete ToolRegistry implementation and associated tests
+15. Verify golangci-lint + go test + manual init smoke tests all pass
 
 ### Rollback Plan
 - Keep git history clean with small, focused commits
 - Each phase can be reverted independently
 - If issues found post-merge, revert entire refactor (single change ID)
-- Marker utilities remaining in init/ means providers can be moved back easily
+- ProviderKit maintains marker/template helpers, so providers can be moved back without touching orchestrator logic
 
 ## Open Questions
 

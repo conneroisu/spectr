@@ -9,7 +9,7 @@ The initialization wizard SHALL present all AI tool options in a single unified 
 #### Scenario: Display all tools in single list
 - **WHEN** user runs `spectr init` and reaches the tool selection screen
 - **THEN** all 17+ AI tools are displayed in a single flat list
-- **AND** tools are sorted by priority (1-17+)
+- **AND** tools are sorted by the priority value defined in provider metadata (1-17+)
 - **AND** no section headers (e.g., "Config-Based Tools", "Slash Command Tools") are shown
 - **AND** each tool appears as a single checkbox item with its name
 - **AND** tools are discovered from the provider registry, not hardcoded
@@ -39,3 +39,8 @@ The initialization wizard SHALL present all AI tool options in a single unified 
 - **THEN** the help text shows keyboard controls (↑/↓, space, a, n, enter, q)
 - **AND** the help text does NOT reference tool groupings or categories
 - **AND** the screen title clearly indicates "Select AI Tools to Configure"
+
+#### Scenario: Newly registered tools appear automatically
+- **WHEN** a provider registers new metadata (ID, name, priority)
+- **THEN** the wizard list reflects the change without code edits in the UI layer
+- **AND** the new provider can be selected, configured, and auto-installs slash commands if specified

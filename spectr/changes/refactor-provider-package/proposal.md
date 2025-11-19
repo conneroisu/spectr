@@ -7,6 +7,8 @@ The `internal/init/configurator.go` file has grown to 831 lines containing all 1
 ## What Changes
 
 - Create new `internal/providers` package with provider interface and registry
+- Add `internal/providerkit` package that hosts the Configurator alias, shared marker/template utilities, and base slash implementation to avoid import cycles
+- Move tool metadata (friendly name, priority, config/slash files, auto-install relationships) into the provider registry so the wizard/executor discover providers dynamically
 - Extract all 19+ provider implementations into individual files (one per provider)
 - Unify config-based providers (CLAUDE.md creators) and slash-command providers under common interface
 - Replace hardcoded `executor.getConfigurator()` switch statement with registry lookup
@@ -19,9 +21,10 @@ The `internal/init/configurator.go` file has grown to 831 lines containing all 1
 
 - Affected specs: `cli-interface` (initialization wizard), `cli-framework` (new provider architecture)
 - Affected code:
-  - `internal/init/configurator.go` (major reduction, extract all concrete types)
+  - `internal/providerkit/` (new shared utilities + interface)
+  - `internal/providers/` (19+ provider files plus registry metadata)
+  - `internal/init/configurator.go` (major reduction, now consumes ProviderKit)
   - `internal/init/executor.go` (replace switch with registry lookup)
-  - `internal/init/registry.go` (add provider registration mechanism)
-  - New package: `internal/providers/` (19+ new files)
-- No changes needed: `wizard.go`, `templates.go`, `filesystem.go` (already use interface)
+  - `internal/init/wizard.go` (read provider metadata instead of hardcoded registry)
+- `internal/init/templates.go` and filesystem helpers move into ProviderKit but retain behavior
 - All existing tests must pass with updated imports

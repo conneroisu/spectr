@@ -30,10 +30,10 @@ The system SHALL organize provider implementations in a separate `internal/provi
 
 ### Requirement: Provider Interface
 
-The system SHALL define a Provider interface (aliased as Configurator for backward compatibility) that all provider implementations must satisfy.
+The system SHALL define a Provider interface (aliased as Configurator for backward compatibility) inside `internal/providerkit` so both orchestrator and provider packages share the same contract without import cycles.
 
 #### Scenario: Provider interface definition
-- **WHEN** the provider package is examined
+- **WHEN** the provider kit package is examined
 - **THEN** it defines a Provider interface with methods: Configure, IsConfigured, GetName
 - **AND** Configure accepts projectPath and spectrDir parameters
 - **AND** Configure returns an error if configuration fails
@@ -82,9 +82,35 @@ The system SHALL provide a global provider registry that maps provider IDs to pr
 #### Scenario: Registry introspection
 - **WHEN** code needs to list all registered providers
 - **THEN** it calls providers.ListProviders()
-- **AND** returns a slice of all provider IDs
-- **AND** the list is sorted alphabetically
-- **AND** useful for debugging and validation
+- **AND** receives structured metadata (ID, name, type, priority, output files, auto-install relationships)
+- **AND** the list is sorted alphabetically by ID as a convenience API
+- **AND** useful for debugging, validation, and UI rendering
+
+#### Scenario: Registry supplies wizard metadata
+- **WHEN** the init wizard requests tool options
+- **THEN** it can read friendly names, help text, and priorities from the registry definitions
+- **AND** the wizard never maintains a parallel hardcoded list
+- **AND** adding a new provider entry automatically propagates to the UI
+
+### Requirement: Provider Metadata
+
+The registry SHALL store the metadata necessary for CLI UX (names, priorities), execution (file paths, slash auto-install), and dependency handling alongside each provider.
+
+#### Scenario: Metadata describes files produced
+- **WHEN** a provider registers, it specifies the absolute/relative paths it writes
+- **AND** executor can report created vs updated files without poking concrete types
+- **AND** slash providers declare their three command files explicitly
+
+#### Scenario: Config-to-slash mapping lives in metadata
+- **WHEN** a config provider depends on slash commands
+- **THEN** its metadata declares which slash provider(s) should auto-install
+- **AND** executor reads this relationship from the registry instead of a map
+- **AND** removing or adding a mapping occurs entirely within provider registration
+
+#### Scenario: Wizard ordering derives from metadata
+- **WHEN** the wizard sorts the checkbox list
+- **THEN** it uses metadata.Priority values
+- **AND** no additional constants or manual indices exist outside the registry
 
 ### Requirement: Config-Based Providers
 
@@ -187,26 +213,22 @@ The system SHALL update the executor to use registry-based provider lookup inste
 - **AND** same error messages are shown
 - **AND** wizard interaction is unchanged
 
-### Requirement: Marker Utilities Remain in Init Package
+### Requirement: Shared ProviderKit Utilities
 
-The system SHALL keep shared marker utilities (UpdateFileWithMarkers, etc.) in the `internal/init` package for use by providers.
+The system SHALL centralize shared provider helpers (marker utilities, template manager, slash base implementation) in a dedicated `internal/providerkit` package to prevent import cycles.
 
 #### Scenario: Marker utilities location
-- **WHEN** internal/init/configurator.go is examined
-- **THEN** it contains UpdateFileWithMarkers() function
-- **AND** it contains marker constant definitions (SpectrStartMarker, SpectrEndMarker)
-- **AND** it contains marker validation functions
-- **AND** these utilities are NOT moved to providers package
+- **WHEN** providerkit is examined
+- **THEN** it exposes UpdateFileWithMarkers(), SpectrStartMarker, SpectrEndMarker, and helper validation functions
+- **AND** these helpers are the single source of truth used by every provider implementation
 
-#### Scenario: Providers import marker utilities
-- **WHEN** a provider needs to use marker-based updates
-- **THEN** it imports "internal/init"
-- **AND** calls init.UpdateFileWithMarkers()
-- **AND** uses init.SpectrStartMarker and init.SpectrEndMarker
-- **AND** no circular import occurs (providers -> init, not init -> providers)
+#### Scenario: Template manager location
+- **WHEN** providerkit is inspected
+- **THEN** the embedded template manager used by providers and executor lives there
+- **AND** providers access templates without referencing the init package
+- **AND** init orchestrator uses the same manager so template parsing logic stays consistent
 
-#### Scenario: Marker utilities are reusable
-- **WHEN** new providers are added
-- **THEN** they can use marker utilities without duplication
-- **AND** marker behavior is consistent across all providers
-- **AND** marker logic is maintained in one place
+#### Scenario: Slash base implementation
+- **WHEN** base slash provider logic is needed
+- **THEN** providerkit exposes it so slash providers can reuse the implementation
+- **AND** init executor does not need to import concrete slash types directly
