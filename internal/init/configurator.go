@@ -178,7 +178,7 @@ func (*ClaudeCodeConfigurator) GetName() string {
 // ClineConfigurator configures Cline
 type ClineConfigurator struct{}
 
-func (_c *ClineConfigurator) Configure(projectPath, _spectrDir string) error {
+func (*ClineConfigurator) Configure(projectPath, _spectrDir string) error {
 	tm, err := NewTemplateManager()
 	if err != nil {
 		return err
@@ -207,7 +207,7 @@ func (*ClineConfigurator) GetName() string {
 // CostrictConfigurator configures CoStrict
 type CostrictConfigurator struct{}
 
-func (_c *CostrictConfigurator) Configure(projectPath, _spectrDir string) error {
+func (*CostrictConfigurator) Configure(projectPath, _spectrDir string) error {
 	tm, err := NewTemplateManager()
 	if err != nil {
 		return err
@@ -236,7 +236,7 @@ func (*CostrictConfigurator) GetName() string {
 // QoderConfigurator configures Qoder
 type QoderConfigurator struct{}
 
-func (_c *QoderConfigurator) Configure(projectPath, _spectrDir string) error {
+func (*QoderConfigurator) Configure(projectPath, _spectrDir string) error {
 	tm, err := NewTemplateManager()
 	if err != nil {
 		return err
@@ -252,20 +252,20 @@ func (_c *QoderConfigurator) Configure(projectPath, _spectrDir string) error {
 	return UpdateFileWithMarkers(filePath, content, SpectrStartMarker, SpectrEndMarker)
 }
 
-func (_c *QoderConfigurator) IsConfigured(projectPath string) bool {
+func (*QoderConfigurator) IsConfigured(projectPath string) bool {
 	filePath := filepath.Join(projectPath, "QODER.md")
 
 	return FileExists(filePath)
 }
 
-func (_c *QoderConfigurator) GetName() string {
+func (*QoderConfigurator) GetName() string {
 	return "Qoder"
 }
 
 // CodeBuddyConfigurator configures CodeBuddy
 type CodeBuddyConfigurator struct{}
 
-func (_c *CodeBuddyConfigurator) Configure(projectPath, _spectrDir string) error {
+func (*CodeBuddyConfigurator) Configure(projectPath, _spectrDir string) error {
 	tm, err := NewTemplateManager()
 	if err != nil {
 		return err
@@ -281,13 +281,13 @@ func (_c *CodeBuddyConfigurator) Configure(projectPath, _spectrDir string) error
 	return UpdateFileWithMarkers(filePath, content, SpectrStartMarker, SpectrEndMarker)
 }
 
-func (_c *CodeBuddyConfigurator) IsConfigured(projectPath string) bool {
+func (*CodeBuddyConfigurator) IsConfigured(projectPath string) bool {
 	filePath := filepath.Join(projectPath, "CODEBUDDY.md")
 
 	return FileExists(filePath)
 }
 
-func (_c *CodeBuddyConfigurator) GetName() string {
+func (*CodeBuddyConfigurator) GetName() string {
 	return "CodeBuddy"
 }
 

@@ -14,7 +14,8 @@ func GetActiveChanges(projectPath string) ([]string, error) {
 	changesDir := filepath.Join(projectPath, "spectr", "changes")
 
 	// Check if changes directory exists
-	if _, err := os.Stat(changesDir); os.IsNotExist(err) {
+	_, err := os.Stat(changesDir)
+	if os.IsNotExist(err) {
 		return make([]string, 0), nil
 	}
 
@@ -42,7 +43,8 @@ func GetActiveChanges(projectPath string) ([]string, error) {
 
 		// Check if proposal.md exists
 		proposalPath := filepath.Join(changesDir, entry.Name(), "proposal.md")
-		if _, err := os.Stat(proposalPath); err == nil {
+		_, err = os.Stat(proposalPath)
+		if err == nil {
 			changes = append(changes, entry.Name())
 		}
 	}
