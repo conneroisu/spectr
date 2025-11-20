@@ -11,14 +11,16 @@ import (
 
 // ClipboardWriter is an interface for writing to clipboard
 type ClipboardWriter interface {
+	// WriteAll writes the given text to the clipboard
 	WriteAll(text string) error
 }
 
-// realClipboardWriter implements ClipboardWriter using the actual clipboard library
+// realClipboardWriter implements ClipboardWriter using the actual
+// clipboard library
 type realClipboardWriter struct{}
 
 // WriteAll writes text to the system clipboard
-func (r realClipboardWriter) WriteAll(text string) error {
+func (_ realClipboardWriter) WriteAll(text string) error {
 	return clipboard.WriteAll(text)
 }
 
@@ -30,6 +32,7 @@ type mockClipboardWriter struct {
 // WriteAll stores text in memory instead of writing to clipboard
 func (m *mockClipboardWriter) WriteAll(text string) error {
 	m.CopiedText = text
+
 	return nil
 }
 
