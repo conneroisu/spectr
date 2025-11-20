@@ -69,7 +69,7 @@ func TestBuildCommitMessage(t *testing.T) {
 
 			// Skip specs should not have spec operations section
 			if tt.ctx.SkipSpecs && strings.Contains(got, "Spec operations applied:") {
-				t.Errorf(
+				t.Error(
 					"buildCommitMessage() should not contain spec operations when SkipSpecs=true",
 				)
 			}
@@ -191,10 +191,8 @@ func TestBuildPRBody(t *testing.T) {
 			}
 
 			// Check that skip specs doesn't show operations
-			if tt.ctx.SkipSpecs {
-				if strings.Contains(got, "Spec operations applied:") {
-					t.Errorf("buildPRBody() should not contain operations when SkipSpecs=true")
-				}
+			if tt.ctx.SkipSpecs && strings.Contains(got, "Spec operations applied:") {
+				t.Error("buildPRBody() should not contain operations when SkipSpecs=true")
 			}
 		})
 	}
