@@ -46,10 +46,11 @@ type interactiveModel struct {
 	quitting    bool
 	err         error
 	helpText    string
-	itemType    string    // "spec", "change", or "all"
-	projectPath string    // root directory of the project
-	allItems    ItemList  // all items when in unified mode
-	filterType  *ItemType // current filter when in unified mode (nil = show all)
+	itemType    string          // "spec", "change", or "all"
+	projectPath string          // root directory of the project
+	allItems    ItemList        // all items when in unified mode
+	filterType  *ItemType       // current filter when in unified mode (nil = show all)
+	clipboard   ClipboardWriter // clipboard writer for copying IDs
 }
 
 // Init initializes the model
@@ -120,7 +121,7 @@ func (m interactiveModel) handleEnter() interactiveModel {
 	m.copied = true
 
 	// Copy to clipboard
-	err := copyToClipboard(m.selectedID)
+	err := copyToClipboard(m.selectedID, m.clipboard)
 	if err != nil {
 		m.err = err
 	}
@@ -359,6 +360,7 @@ func RunInteractiveChanges(changes []ChangeInfo, projectPath string) error {
 		table:       t,
 		itemType:    "change",
 		projectPath: projectPath,
+		clipboard:   realClipboardWriter{},
 		helpText: fmt.Sprintf(
 			"↑/↓ or j/k: navigate | Enter: copy ID | e: edit proposal | q: quit | showing: %d | project: %s",
 			len(rows),
@@ -426,6 +428,7 @@ func RunInteractiveArchive(changes []ChangeInfo, projectPath string) (string, er
 	m := interactiveModel{
 		table:       t,
 		projectPath: projectPath,
+		clipboard:   realClipboardWriter{},
 		helpText: fmt.Sprintf(
 			"↑/↓ or j/k: navigate | Enter: select | q: quit | showing: %d | project: %s",
 			len(rows),
@@ -486,6 +489,7 @@ func RunInteractiveSpecs(specs []SpecInfo, projectPath string) error {
 		table:       t,
 		itemType:    "spec",
 		projectPath: projectPath,
+		clipboard:   realClipboardWriter{},
 		helpText: fmt.Sprintf(
 			"↑/↓ or j/k: navigate | Enter: copy ID | e: edit spec | q: quit | showing: %d | project: %s",
 			len(specs),
@@ -571,6 +575,7 @@ func RunInteractiveAll(items ItemList, projectPath string) error {
 		projectPath: projectPath,
 		allItems:    items,
 		filterType:  nil, // Start with all items visible
+		clipboard:   realClipboardWriter{},
 		helpText: fmt.Sprintf(
 			"↑/↓ or j/k: navigate | Enter: copy ID | e: edit spec | t: toggle filter (all) | q: quit | showing: %d | project: %s",
 			len(rows),

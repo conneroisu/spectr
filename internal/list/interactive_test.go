@@ -129,16 +129,62 @@ func TestRunInteractiveSpecs_ValidData(_ *testing.T) {
 }
 
 func TestCopyToClipboard(t *testing.T) {
-	// Note: This test may fail in headless environments
-	// It's more of a smoke test to ensure the function doesn't panic
-	testString := "test-id-123"
-	err := copyToClipboard(testString)
+	t.Run("with mock clipboard", func(t *testing.T) {
+		testString := "test-id-123"
+		mockClipboard := &mockClipboardWriter{}
 
-	// We don't fail the test on error because clipboard may not be available
-	// in CI/CD environments. We just want to ensure no panic occurs.
-	if err != nil {
-		t.Logf("Clipboard operation failed (expected in headless env): %v", err)
-	}
+		err := copyToClipboard(testString, mockClipboard)
+		if err != nil {
+			t.Errorf("copyToClipboard with mock should not error, got: %v", err)
+		}
+
+		if mockClipboard.CopiedText != testString {
+			t.Errorf("Expected clipboard to contain %q, got %q", testString, mockClipboard.CopiedText)
+		}
+	})
+}
+
+func TestMockClipboardWriter(t *testing.T) {
+	t.Run("stores text correctly", func(t *testing.T) {
+		mock := &mockClipboardWriter{}
+		testText := "test-value"
+
+		err := mock.WriteAll(testText)
+		if err != nil {
+			t.Errorf("mockClipboardWriter.WriteAll should not error, got: %v", err)
+		}
+
+		if mock.CopiedText != testText {
+			t.Errorf("Expected CopiedText to be %q, got %q", testText, mock.CopiedText)
+		}
+	})
+
+	t.Run("can be overwritten", func(t *testing.T) {
+		mock := &mockClipboardWriter{}
+
+		_ = mock.WriteAll("first")
+		_ = mock.WriteAll("second")
+
+		if mock.CopiedText != "second" {
+			t.Errorf("Expected CopiedText to be %q, got %q", "second", mock.CopiedText)
+		}
+	})
+}
+
+func TestRealClipboardWriter(t *testing.T) {
+	t.Run("delegates to clipboard library", func(t *testing.T) {
+		// This is just a smoke test to ensure the real clipboard writer compiles
+		// and has the correct interface. We don't actually test clipboard access
+		// to avoid writing to user's clipboard during tests.
+		realWriter := realClipboardWriter{}
+
+		// Just verify it implements the interface
+		var _ ClipboardWriter = realWriter
+
+		// We can't easily test the actual clipboard without mocking the underlying
+		// clipboard library, but we've verified the interface is correct
+		t.Log("realClipboardWriter implements ClipboardWriter interface")
+	})
 }
 
 func TestInteractiveModel_Init(t *testing.T) {
@@ -219,6 +265,7 @@ func TestInteractiveModel_HandleEdit(t *testing.T) {
 		model := interactiveModel{
 			itemType:    "spec",
 			projectPath: tmpDir,
+			clipboard:   &mockClipboardWriter{},
 			table: createMockTable([][]string{
 				{specID, "Test Spec", "1"},
 			}),
@@ -273,6 +320,7 @@ func TestInteractiveModel_HandleEdit(t *testing.T) {
 		model := interactiveModel{
 			itemType:    "change",
 			projectPath: tmpDir,
+			clipboard:   &mockClipboardWriter{},
 			table:       tbl,
 		}
 
@@ -293,6 +341,7 @@ func TestInteractiveModel_HandleEdit(t *testing.T) {
 		model := interactiveModel{
 			itemType:    "spec",
 			projectPath: tmpDir,
+			clipboard:   &mockClipboardWriter{},
 			table: createMockTable([][]string{
 				{"nonexistent-spec", "Nonexistent Spec", "1"},
 			}),
@@ -400,6 +449,7 @@ func TestHandleToggleFilter(t *testing.T) {
 		allItems:    items,
 		filterType:  nil,
 		projectPath: "/tmp/test",
+		clipboard:   &mockClipboardWriter{},
 	}
 
 	// Test toggle: all -> changes
@@ -466,6 +516,7 @@ func TestEditorOpensOnEKey(t *testing.T) {
 		table:       tbl,
 		itemType:    "spec",
 		projectPath: tmpDir,
+		clipboard:   &mockClipboardWriter{},
 		helpText:    "Test help text",
 	}
 
@@ -544,6 +595,7 @@ func TestEditorOpensForChangeItems(t *testing.T) {
 		table:       tbl,
 		itemType:    "change",
 		projectPath: tmpDir,
+		clipboard:   &mockClipboardWriter{},
 		helpText:    "Test help text",
 	}
 
@@ -651,6 +703,7 @@ func TestEditorOpensInUnifiedMode(t *testing.T) {
 		projectPath: tmpDir,
 		allItems:    items,
 		filterType:  nil,
+		clipboard:   &mockClipboardWriter{},
 		helpText:    "Test help text",
 	}
 
