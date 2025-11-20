@@ -102,6 +102,7 @@ func TestGetCLITool(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetCLITool(%v) error = %v, wantErr %v",
 					tt.platform, err, tt.wantErr)
+
 				return
 			}
 			if result != tt.expected {

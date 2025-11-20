@@ -3,6 +3,7 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -33,7 +34,7 @@ func DetectPlatform() (Platform, string, error) {
 
 	url := strings.TrimSpace(string(output))
 	if url == "" {
-		return PlatformUnknown, "", fmt.Errorf("origin remote URL is empty")
+		return PlatformUnknown, "", errors.New("origin remote URL is empty")
 	}
 
 	// Detect platform from URL
@@ -44,20 +45,24 @@ func DetectPlatform() (Platform, string, error) {
 
 // detectPlatformFromURL detects the platform from a git remote URL
 func detectPlatformFromURL(url string) Platform {
-	url = strings.ToLower(url)
+	lowerURL := strings.ToLower(url)
 
 	// Check for GitHub
-	if strings.Contains(url, "github.com") {
+	if strings.Contains(lowerURL, "github.com") {
 		return PlatformGitHub
 	}
 
 	// Check for GitLab
-	if strings.Contains(url, "gitlab.com") || strings.Contains(url, "gitlab") {
+	gitlabCom := strings.Contains(lowerURL, "gitlab.com")
+	gitlab := strings.Contains(lowerURL, "gitlab")
+	if gitlabCom || gitlab {
 		return PlatformGitLab
 	}
 
 	// Check for Gitea/Forgejo
-	if strings.Contains(url, "gitea") || strings.Contains(url, "forgejo") {
+	gitea := strings.Contains(lowerURL, "gitea")
+	forgejo := strings.Contains(lowerURL, "forgejo")
+	if gitea || forgejo {
 		return PlatformGitea
 	}
 
@@ -91,6 +96,7 @@ func CheckCLIToolInstalled(platform Platform) error {
 	_, err = exec.LookPath(tool)
 	if err != nil {
 		installURL := getInstallURL(platform)
+
 		return fmt.Errorf(
 			"%s not found in PATH. Install from: %s",
 			tool,

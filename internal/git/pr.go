@@ -49,7 +49,12 @@ func createGitHubPR(tool string, opts PROptions) (string, error) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		msg := fmt.Sprintf("create GitHub PR: %v\nOutput: %s", err, string(output))
+		msg := fmt.Sprintf(
+			"create GitHub PR: %v\nOutput: %s",
+			err,
+			string(output),
+		)
+
 		return "", fmt.Errorf("%s", msg)
 	}
 
@@ -68,7 +73,12 @@ func createGitLabPR(tool string, opts PROptions) (string, error) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		msg := fmt.Sprintf("create GitLab MR: %v\nOutput: %s", err, string(output))
+		msg := fmt.Sprintf(
+			"create GitLab MR: %v\nOutput: %s",
+			err,
+			string(output),
+		)
+
 		return "", fmt.Errorf("%s", msg)
 	}
 
@@ -87,7 +97,12 @@ func createGiteaPR(tool string, opts PROptions) (string, error) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		msg := fmt.Sprintf("create Gitea PR: %v\nOutput: %s", err, string(output))
+		msg := fmt.Sprintf(
+			"create Gitea PR: %v\nOutput: %s",
+			err,
+			string(output),
+		)
+
 		return "", fmt.Errorf("%s", msg)
 	}
 
@@ -125,7 +140,9 @@ func isURLStart(s string) bool {
 
 // findURLInLine extracts a URL from a line that contains one embedded.
 func findURLInLine(line string) string {
-	if !strings.Contains(line, "http://") && !strings.Contains(line, "https://") {
+	httpPresent := strings.Contains(line, "http://")
+	httpsPresent := strings.Contains(line, "https://")
+	if !httpPresent && !httpsPresent {
 		return ""
 	}
 
