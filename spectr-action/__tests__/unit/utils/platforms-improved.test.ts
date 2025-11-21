@@ -11,16 +11,16 @@ describe("Platform Utilities (Improved)", () => {
       restore?.();
     });
 
-    it("should map arm64 to aarch64", () => {
+    it("should map arm64 to arm64", () => {
       restore = mockArch("arm64");
       const result = getArch();
-      assert.equal(result, "aarch64");
+      assert.equal(result, "arm64");
     });
 
-    it("should map ia32 to i686", () => {
+    it("should map ia32 to i386", () => {
       restore = mockArch("ia32");
       const result = getArch();
-      assert.equal(result, "i686");
+      assert.equal(result, "i386");
     });
 
     it("should map x64 to x86_64", () => {
@@ -43,22 +43,22 @@ describe("Platform Utilities (Improved)", () => {
       restore?.();
     });
 
-    it("should map darwin to apple-darwin", () => {
+    it("should map darwin to Darwin", () => {
       restore = mockPlatform("darwin");
       const result = getPlatform();
-      assert.equal(result, "apple-darwin");
+      assert.equal(result, "Darwin");
     });
 
-    it("should map linux to unknown-linux-gnu", () => {
+    it("should map linux to Linux", () => {
       restore = mockPlatform("linux");
       const result = getPlatform();
-      assert.equal(result, "unknown-linux-gnu");
+      assert.equal(result, "Linux");
     });
 
-    it("should map win32 to pc-windows-msvc", () => {
+    it("should map win32 to Windows", () => {
       restore = mockPlatform("win32");
       const result = getPlatform();
-      assert.equal(result, "pc-windows-msvc");
+      assert.equal(result, "Windows");
     });
 
     it("should return undefined for unsupported platform", () => {

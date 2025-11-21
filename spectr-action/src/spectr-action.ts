@@ -79,8 +79,7 @@ async function setupSpectr(
     core.info(
       `Found spectr in tool-cache for version ${toolCacheResult.version}`,
     );
-    const executableName =
-      platform === "pc-windows-msvc" ? "spectr.exe" : "spectr";
+    const executableName = platform === "Windows" ? "spectr.exe" : "spectr";
     return path.join(toolCacheResult.installedPath, executableName);
   }
 
@@ -93,8 +92,7 @@ async function setupSpectr(
     githubToken,
   );
 
-  const executableName =
-    platform === "pc-windows-msvc" ? "spectr.exe" : "spectr";
+  const executableName = platform === "Windows" ? "spectr.exe" : "spectr";
   return path.join(downloadResult.cachedToolDir, executableName);
 }
 

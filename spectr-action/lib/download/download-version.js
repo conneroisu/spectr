@@ -57,9 +57,9 @@ function tryGetFromToolCache(arch, version) {
     return { installedPath, version: resolvedVersion };
 }
 async function downloadVersion(platform, arch, version, githubToken) {
-    const artifact = `spectr-${arch}-${platform}`;
+    const artifact = `spectr_${platform}_${arch}`;
     let extension = ".tar.gz";
-    if (platform === "pc-windows-msvc") {
+    if (platform === "Windows") {
         extension = ".zip";
     }
     const downloadUrl = constructDownloadUrl(version, platform, arch);
@@ -71,10 +71,10 @@ async function downloadVersion(platform, arch, version, githubToken) {
     return { cachedToolDir, version: version };
 }
 function constructDownloadUrl(version, platform, arch) {
-    // Spectr uses simple artifact naming: spectr-{arch}-{platform}.{ext}
-    const artifact = `spectr-${arch}-${platform}`;
+    // GoReleaser artifact naming: spectr_{Platform}_{arch}.{ext}
+    const artifact = `spectr_${platform}_${arch}`;
     let extension = ".tar.gz";
-    if (platform === "pc-windows-msvc") {
+    if (platform === "Windows") {
         extension = ".zip";
     }
     // Spectr releases use the version tag directly
@@ -82,7 +82,7 @@ function constructDownloadUrl(version, platform, arch) {
 }
 async function extractDownloadedArtifact(_version, downloadPath, extension, platform, _artifact) {
     let spectrDir;
-    if (platform === "pc-windows-msvc") {
+    if (platform === "Windows") {
         const fullPathWithExtension = `${downloadPath}${extension}`;
         await node_fs_1.promises.copyFile(downloadPath, fullPathWithExtension);
         spectrDir = await tc.extractZip(fullPathWithExtension);

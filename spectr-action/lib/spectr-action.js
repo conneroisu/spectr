@@ -90,13 +90,13 @@ async function setupSpectr(platform, arch, versionInput, githubToken) {
     const toolCacheResult = (0, download_version_1.tryGetFromToolCache)(arch, resolvedVersion);
     if (toolCacheResult.installedPath) {
         core.info(`Found spectr in tool-cache for version ${toolCacheResult.version}`);
-        const executableName = platform === "pc-windows-msvc" ? "spectr.exe" : "spectr";
+        const executableName = platform === "Windows" ? "spectr.exe" : "spectr";
         return path.join(toolCacheResult.installedPath, executableName);
     }
     // Download and cache the binary
     core.info(`Downloading spectr version ${resolvedVersion}...`);
     const downloadResult = await (0, download_version_1.downloadVersion)(platform, arch, resolvedVersion, githubToken);
-    const executableName = platform === "pc-windows-msvc" ? "spectr.exe" : "spectr";
+    const executableName = platform === "Windows" ? "spectr.exe" : "spectr";
     return path.join(downloadResult.cachedToolDir, executableName);
 }
 /**

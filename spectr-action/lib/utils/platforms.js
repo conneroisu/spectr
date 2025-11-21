@@ -5,8 +5,8 @@ exports.getPlatform = getPlatform;
 function getArch() {
     const arch = process.arch;
     const archMapping = {
-        arm64: "aarch64",
-        ia32: "i686",
+        arm64: "arm64",
+        ia32: "i386",
         x64: "x86_64",
     };
     if (arch in archMapping) {
@@ -16,9 +16,9 @@ function getArch() {
 function getPlatform() {
     const platform = process.platform;
     const platformMapping = {
-        darwin: "apple-darwin",
-        linux: "unknown-linux-gnu",
-        win32: "pc-windows-msvc",
+        darwin: "Darwin",
+        linux: "Linux",
+        win32: "Windows",
     };
     if (platform in platformMapping) {
         return platformMapping[platform];

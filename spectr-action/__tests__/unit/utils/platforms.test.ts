@@ -4,7 +4,7 @@ import { getArch, getPlatform } from "../../../src/utils/platforms";
 
 describe("Platform Utilities", () => {
   describe("getArch()", () => {
-    it("should map arm64 to aarch64", () => {
+    it("should map arm64 to arm64", () => {
       // Mock process.arch
       const originalArch = process.arch;
       Object.defineProperty(process, "arch", {
@@ -13,7 +13,7 @@ describe("Platform Utilities", () => {
       });
 
       const result = getArch();
-      assert.equal(result, "aarch64");
+      assert.equal(result, "arm64");
 
       // Restore original
       Object.defineProperty(process, "arch", {
@@ -22,7 +22,7 @@ describe("Platform Utilities", () => {
       });
     });
 
-    it("should map ia32 to i686", () => {
+    it("should map ia32 to i386", () => {
       const originalArch = process.arch;
       Object.defineProperty(process, "arch", {
         configurable: true,
@@ -30,7 +30,7 @@ describe("Platform Utilities", () => {
       });
 
       const result = getArch();
-      assert.equal(result, "i686");
+      assert.equal(result, "i386");
 
       Object.defineProperty(process, "arch", {
         configurable: true,
@@ -72,7 +72,7 @@ describe("Platform Utilities", () => {
   });
 
   describe("getPlatform()", () => {
-    it("should map darwin to apple-darwin", () => {
+    it("should map darwin to Darwin", () => {
       const originalPlatform = process.platform;
       Object.defineProperty(process, "platform", {
         configurable: true,
@@ -80,7 +80,7 @@ describe("Platform Utilities", () => {
       });
 
       const result = getPlatform();
-      assert.equal(result, "apple-darwin");
+      assert.equal(result, "Darwin");
 
       Object.defineProperty(process, "platform", {
         configurable: true,
@@ -88,7 +88,7 @@ describe("Platform Utilities", () => {
       });
     });
 
-    it("should map linux to unknown-linux-gnu", () => {
+    it("should map linux to Linux", () => {
       const originalPlatform = process.platform;
       Object.defineProperty(process, "platform", {
         configurable: true,
@@ -96,7 +96,7 @@ describe("Platform Utilities", () => {
       });
 
       const result = getPlatform();
-      assert.equal(result, "unknown-linux-gnu");
+      assert.equal(result, "Linux");
 
       Object.defineProperty(process, "platform", {
         configurable: true,
@@ -104,7 +104,7 @@ describe("Platform Utilities", () => {
       });
     });
 
-    it("should map win32 to pc-windows-msvc", () => {
+    it("should map win32 to Windows", () => {
       const originalPlatform = process.platform;
       Object.defineProperty(process, "platform", {
         configurable: true,
@@ -112,7 +112,7 @@ describe("Platform Utilities", () => {
       });
 
       const result = getPlatform();
-      assert.equal(result, "pc-windows-msvc");
+      assert.equal(result, "Windows");
 
       Object.defineProperty(process, "platform", {
         configurable: true,
